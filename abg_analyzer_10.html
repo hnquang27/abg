@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phân tích KMĐM</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+:root{
+  --slate:#0F172A; --navy:#1E3A5F; --blue:#2563EB; --blue-d:#1D4ED8;
+  --blue-l:#EFF6FF; --blue-m:#BFDBFE;
+  --green:#059669; --green-l:#ECFDF5; --green-m:#A7F3D0; --green-d:#065F46;
+  --amber:#D97706; --amber-l:#FFFBEB; --amber-m:#FDE68A;
+  --red:#DC2626; --red-l:#FEF2F2; --red-m:#FECACA; --red-d:#991B1B;
+  --violet:#7C3AED; --violet-l:#F3E8FF;
+  --gray-50:#F8FAFC; --gray-100:#F1F5F9; --gray-200:#E2E8F0;
+  --gray-300:#CBD5E1; --gray-400:#94A3B8; --gray-600:#475569; --gray-900:#0F172A;
+  --mono:'SFMono-Regular','Consolas','Liberation Mono',monospace;
+  --sans:'Segoe UI',-apple-system,system-ui,Arial,sans-serif;
+  --radius:10px;
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 4px 12px rgba(0,0,0,.05);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--gray-100);color:var(--gray-900);font-size:13.5px;line-height:1.55;min-height:100vh}
+
+/* ===== APP: rail trái + kết quả phải ===== */
+.app{display:grid;grid-template-columns:330px 1fr;gap:18px;max-width:1320px;margin:0 auto;padding:18px 20px 0;align-items:start}
+@media(max-width:920px){.app{grid-template-columns:1fr}}
+.rail{display:grid;gap:12px;position:sticky;top:18px}
+@media(max-width:920px){.rail{position:static}}
+
+#pasteCapture{position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden}
+
+/* patient card navy */
+.patient-card{background:var(--slate);color:#fff;border-radius:var(--radius);padding:13px 16px;display:none}
+.patient-card.show{display:block}
+.patient-card .pt-name{font-size:15.5px;font-weight:700;letter-spacing:-.01em}
+.patient-card .pt-meta{font-size:11px;opacity:.62;margin-top:3px;font-family:var(--mono)}
+.patient-card .pt-diag{font-size:11px;color:#93C5FD;margin-top:5px;font-style:italic}
+
+/* input cards */
+.card{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+.card-head{background:var(--gray-100);border-bottom:1px solid var(--gray-200);padding:9px 15px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-600)}
+.card-head .sub{display:block;font-weight:400;opacity:.7;font-size:9.5px;text-transform:none;letter-spacing:0;margin-top:1px}
+.card-body{padding:13px 15px;display:grid;gap:11px 12px;grid-template-columns:1fr 1fr}
+.card-foot{padding:11px 15px;border-top:1px solid var(--gray-200);background:var(--gray-50)}
+.field label{display:block;font-size:10.5px;font-weight:700;color:var(--gray-600);letter-spacing:.02em;margin-bottom:4px}
+.field input{width:100%;padding:7px 10px;border:1.5px solid var(--gray-200);border-radius:7px;font-family:var(--mono);font-size:14px;font-weight:600;color:var(--gray-900);background:#fff;transition:border-color .15s,background .4s,box-shadow .15s;-moz-appearance:textfield}
+.field input::-webkit-inner-spin-button,.field input::-webkit-outer-spin-button{-webkit-appearance:none}
+.field input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.field input.filled{border-color:var(--green);background:var(--green-l)}
+.btn-analyze{width:100%;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;font-family:var(--sans);cursor:pointer;letter-spacing:.04em;text-transform:uppercase;transition:background .15s,transform .1s,box-shadow .15s;box-shadow:0 3px 10px rgba(37,99,235,.28)}
+.btn-analyze:hover{background:var(--blue-d);box-shadow:0 5px 16px rgba(37,99,235,.36)}
+.btn-analyze:active{transform:scale(.99)}
+
+/* ===== RESULTS ===== */
+.results{display:none}
+.results.show{display:block}
+.empty-hint{text-align:center;color:var(--gray-400);font-size:13px;padding:40px 20px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius)}
+.warn-banner{border-radius:10px;padding:12px 15px;margin-bottom:14px;font-size:12.5px;line-height:1.55;display:grid;gap:5px}
+.warn-banner.amber{background:var(--amber-l);border:1px solid var(--amber-m);color:#92400E}
+.warn-banner.red{background:var(--red-l);border:1px solid var(--red-m);color:var(--red-d)}
+.warn-banner .wb-t{font-weight:700}
+.warn-banner .wb-i{margin-left:2px}
+
+/* 2 cột độc lập xếp khít */
+.res-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+@media(max-width:760px){.res-cols{grid-template-columns:1fr}}
+.res-col{display:grid;gap:14px;align-content:start}
+
+/* ABG summary */
+.summary-box{background:var(--slate);color:#fff;border-radius:12px;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,.22)}
+.summary-head{display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.1)}
+.summary-head .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.summary-head h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;flex:1}
+.summary-head .meta{font-size:10px;opacity:.5;font-family:var(--mono)}
+.btn-copy{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:5px 11px;font-size:11.5px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:background .15s}
+.btn-copy:hover{background:rgba(255,255,255,.22)}.btn-copy.done{background:var(--green);border-color:var(--green)}
+.summary-body{padding:15px 16px;font-family:var(--mono);font-size:13.5px;line-height:1.8;white-space:pre-wrap}
+.summary-body .sl{display:block}
+
+/* section card */
+.res-section{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.rs-head{padding:10px 15px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-600);background:var(--gray-50);border-bottom:1px solid var(--gray-200);display:flex;align-items:center;gap:8px}
+.rs-num{width:19px;height:19px;border-radius:5px;background:var(--slate);color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rs-head .rs-sub{margin-left:auto;font-size:9.5px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--gray-400);font-style:italic}
+.rs-body{padding:13px 15px;display:grid;gap:9px}
+
+/* metric rows */
+.metric{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.metric .mk{font-size:11.5px;color:var(--gray-600);min-width:140px;font-weight:600;flex:1}
+.metric .mv{font-family:var(--mono);font-size:13.5px;font-weight:700;color:var(--slate)}
+.metric .mn{font-size:11px;color:var(--gray-400);font-style:italic}
+
+/* conclusion chips - viền màu, không icon */
+.concl{padding:9px 12px;border-radius:8px;font-size:12.5px;line-height:1.5;border-left:3px solid var(--gray-300);background:var(--gray-50)}
+.concl.s-ok{border-color:var(--green);background:var(--green-l);color:var(--green-d)}
+.concl.s-warn{border-color:var(--amber);background:var(--amber-l);color:#92400E}
+.concl.s-bad{border-color:var(--red);background:var(--red-l);color:var(--red-d);font-weight:600}
+.concl.s-info{border-color:var(--blue);background:var(--blue-l);color:var(--navy)}
+
+/* lactate dải ngang */
+.lac-band{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.lac-band .lac-val{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--slate);white-space:nowrap}
+.lac-band .lac-val small{font-size:11px;font-weight:600;color:var(--gray-400);margin-left:3px}
+.lac-band .lac-concl{flex:1;text-align:right;font-size:12.5px;font-weight:600;padding:8px 11px;border-radius:8px;border-right:3px solid var(--gray-300);background:var(--gray-50)}
+.lac-band .lac-concl.s-warn{border-color:var(--amber);background:var(--amber-l);color:#92400E}
+.lac-band .lac-concl.s-bad{border-color:var(--red);background:var(--red-l);color:var(--red-d)}
+.lac-band .lac-concl.s-ok{border-color:var(--green);background:var(--green-l);color:var(--green-d)}
+.lac-extra{margin-top:9px}
+
+/* note + cause + orders */
+.note{font-size:11.5px;line-height:1.55;color:var(--gray-600);background:var(--gray-50);border-left:3px solid var(--gray-300);border-radius:6px;padding:8px 11px}
+.note.warn{background:var(--amber-l);border-color:var(--amber);color:#92400E}
+.cause{padding:9px 12px;border-radius:8px;background:#FFFDF5;border:1px solid var(--amber-m);font-size:12px;line-height:1.55}
+.cause .ct{font-weight:700;color:#92400E;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px}
+.cause .cx{color:var(--gray-600)}
+.orders{display:flex;flex-wrap:wrap;gap:8px}
+.order-chip{background:var(--violet-l);color:var(--violet);border:1px solid #E9D5FF;border-radius:7px;padding:6px 11px;font-size:11.5px;font-weight:600}
+
+/* toast */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--slate);color:#fff;padding:10px 16px;border-radius:9px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.22);transform:translateY(80px);opacity:0;transition:transform .28s cubic-bezier(.34,1.56,.64,1),opacity .2s;z-index:400;pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.ok{background:var(--green-d)}.toast.err{background:var(--red-d)}
+
+/* footer */
+.app-foot{text-align:center;padding:26px 20px 30px;margin-top:22px;border-top:1px solid var(--gray-200)}
+.app-foot .ff-org{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--navy)}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div id="pasteCapture" contenteditable="true" aria-hidden="true" tabindex="-1"></div>
+
+    <div class="patient-card" id="ptCard">
+      <div class="pt-name" id="ptName"></div>
+      <div class="pt-meta" id="ptMeta"></div>
+      <div class="pt-diag" id="ptDiag"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Khí máu động mạch</div>
+      <div class="card-body">
+        <div class="field"><label>pH</label><input type="number" id="f_ph" step="0.001"></div>
+        <div class="field"><label>PCO₂ (mmHg)</label><input type="number" id="f_pco2" step="0.1"></div>
+        <div class="field"><label>PO₂ (mmHg)</label><input type="number" id="f_po2" step="0.1"></div>
+        <div class="field"><label>cHCO₃⁻ (mmol/L)</label><input type="number" id="f_hco3" step="0.1"></div>
+        <div class="field"><label>SO₂ (%)</label><input type="number" id="f_so2" step="0.1"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Thông số nhập thêm</div>
+      <div class="card-body">
+        <div class="field"><label>FiO₂ (%)</label><input type="number" id="f_fio2" step="1" min="21" max="100"></div>
+        <div class="field"><label>Tuổi (năm)</label><input type="number" id="f_age" step="1" min="0" max="120"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Xét nghiệm bổ sung</div>
+      <div class="card-body">
+        <div class="field"><label>Na⁺ (mmol/L)</label><input type="number" id="f_na" step="1"></div>
+        <div class="field"><label>Cl⁻ (mmol/L)</label><input type="number" id="f_cl" step="1"></div>
+        <div class="field"><label>Albumin (g/dL)</label><input type="number" id="f_albumin" step="0.1"></div>
+        <div class="field"><label>Hb (g/dL)</label><input type="number" id="f_hb" step="0.1"></div>
+        <div class="field"><label>Lactate (mmol/L)</label><input type="number" id="f_lactate" step="0.01"></div>
+      </div>
+      <div class="card-foot">
+        <button class="btn-analyze" onclick="runAnalysis()">Phân tích</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="results" id="results"></main>
+</div>
+
+<div class="app-foot">
+  <div class="ff-org">KHOA CẤP CỨU - BỆNH VIỆN ĐA KHOA LÃNH BINH THĂNG</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   ENGINE PHÂN TÍCH KMĐM - implement QUY TRÌNH v2.0 (final)
+   Nguồn: Bùi Xuân Phúc · Lê Phước Truyền · Đỗ Thị Tường Oanh
+   Pure functions - không phụ thuộc DOM. Dùng cho cả test (node) và app.
+   ===================================================================== */
+
+/* ---- ngưỡng sinh lý ---- */
+const PH_LO = 7.35, PH_HI = 7.45;
+const CO2_LO = 35, CO2_HI = 45;
+const HCO3_LO = 22, HCO3_HI = 26;
+
+const r1 = (x) => Math.round(x * 10) / 10;     // 1 decimal
+const r2 = (x) => Math.round(x * 100) / 100;   // 2 decimal
+
+/* =====================================================================
+   HÀM CHÍNH
+   I = { ph, pco2, po2, hco3, so2, fio2, age, na, cl, albumin, hb, lactate }
+   Mọi trường có thể null/undefined nếu thiếu.
+   ===================================================================== */
+function analyze(I) {
+  const has = (v) => v !== null && v !== undefined && !Number.isNaN(v) && v !== '';
+  const fio2 = has(I.fio2) ? +I.fio2 : 21;     // mặc định khí trời
+  const roomAir = fio2 <= 21;
+  const FF = fio2 / 100;                         // fraction
+
+  const out = {
+    reliability: { physWarnings: [], sampleWarnings: [], hco3calc: null, delta: null, reliable: null },
+    oxy: null,
+    ab: null,
+    ag: null,
+    lac: null,
+    orders: [],
+    summary: { normal: true, oxyLine: '', abLine: '' },
+    detail: { oxy: [], ab: [], ag: [], lac: [] },
+  };
+  const orderSet = new Set();
+
+  /* state kiềm-toan để tổng hợp summary cuối */
+  const S = {
+    primaryResp: null,        // {dir:'toan'|'kiem', chronicity, exceed}
+    primaryMetab: null,       // {dir:'toan'|'kiem', comp:'bù đủ'|..., subtype:null}
+    added: [],                // ['Kiềm hô hấp phối hợp', ...]
+    tags: new Set(),          // canonical tags: TH KH TC TCt TCk KC
+    lactic: false,
+    lactateLine: null,
+  };
+
+  /* ================= BƯỚC 0 - Độ tin cậy ================= */
+  if (has(I.ph) && has(I.pco2) && has(I.hco3)) {
+    const hco3calc = 0.03 * I.pco2 * Math.pow(10, I.ph - 6.1);
+    const delta = Math.abs(hco3calc - I.hco3);
+    out.reliability.hco3calc = r1(hco3calc);
+    out.reliability.delta = r1(delta);
+    out.reliability.reliable = delta <= 4;
+  }
+  /* 0.2 validation sinh lý - không block */
+  const phys = out.reliability.physWarnings;
+  if (has(I.ph) && (I.ph < 6.8 || I.ph > 7.8)) phys.push('pH ngoài 6,8–7,8');
+  if (has(I.pco2) && (I.pco2 < 10 || I.pco2 > 120)) phys.push('PaCO₂ ngoài 10–120 mmHg');
+  if (has(I.hco3) && (I.hco3 < 2 || I.hco3 > 60)) phys.push('HCO₃⁻ ngoài 2–60 mmol/L');
+  if (has(I.po2) && I.po2 < 20) phys.push('PaO₂ < 20 mmHg');
+
+  /* 0.3 chất lượng mẫu */
+  const samp = out.reliability.sampleWarnings;
+  if (has(I.po2) && has(I.so2) && I.po2 < 40 && I.so2 < 75)
+    samp.push('Nghi máu tĩnh mạch - so sánh SpO₂ đo trực tiếp, cân nhắc lấy lại mẫu.');
+  if (roomAir && has(I.po2) && I.po2 > 130)
+    samp.push('Nghi nhiễm không khí vào mẫu (thở khí trời, PaO₂ > 130 mmHg).');
+
+  /* ================= NHÓM 1 - OXY HÓA MÁU ================= */
+  if (has(I.po2)) {
+    const oxy = { branch: roomAir ? 'A' : 'B', fio2 };
+    let hypoxemiaGrade = null;   // 'nhẹ'|'trung bình'|'nặng'
+    let shhType = null;          // 1|2|3
+    let ardsGrade = null;        // 'nhẹ'|'trung bình'|'nặng'
+    let oxyAbnormal = false;
+    let gasExchAbn = false;      // Tầng 2 - rối loạn trao đổi khí (a/A hoặc A-a), độc lập SHH
+
+    /* 1.1 phân độ PaO₂ - chỉ nhánh A */
+    if (roomAir) {
+      const pred = has(I.age) ? r1(110 - I.age / 2) : null;
+      oxy.pao2Predicted = pred;
+      let g;
+      if (I.po2 > 100) g = { text: 'Tăng oxy máu', status: 'info' };
+      else if (pred !== null && I.po2 >= pred) g = { text: 'Oxy hóa máu bình thường (theo tuổi)', status: 'ok' };
+      else if (pred === null && I.po2 >= 80) g = { text: 'Oxy hóa máu bình thường', status: 'ok' };
+      else if (I.po2 >= 60) { g = { text: 'Hạ oxy máu nhẹ', status: 'warn' }; hypoxemiaGrade = 'nhẹ'; }
+      else if (I.po2 >= 40) { g = { text: 'Hạ oxy máu trung bình', status: 'bad' }; hypoxemiaGrade = 'trung bình'; }
+      else { g = { text: 'Hạ oxy máu nặng', status: 'bad' }; hypoxemiaGrade = 'nặng'; }
+      oxy.pao2Grade = g;
+      if (hypoxemiaGrade) oxyAbnormal = true;
+    } else {
+      oxy.pao2Grade = { text: 'Không phân độ PaO₂ theo tuổi (FiO₂ > 21% - PaO₂ tăng giả tạo)', status: 'info' };
+    }
+
+    /* P/F để dùng cho trigger + 1.3 */
+    const pf = r1(I.po2 / FF);
+    oxy.pf = pf;
+
+    /* trigger SHH */
+    const triggerA = roomAir && I.po2 < 60;
+    const triggerPF = pf < 300;
+    const analyzeSHH = (roomAir ? (triggerA || triggerPF) : triggerPF);
+
+    /* 1.2 cơ chế */
+    if (roomAir) {
+      const pAO2 = r1(150 - I.pco2 / 0.8);
+      const aaActual = r1(pAO2 - I.po2);
+      const aaPred = has(I.age) ? r1(I.age / 4 + 4) : 15; // ~ mặc định nếu thiếu tuổi
+      oxy.pAO2 = pAO2; oxy.aaActual = aaActual; oxy.aaPredicted = aaPred;
+      /* nhiễm không khí: A-a âm */
+      if (aaActual < 0) samp.push('p(A-a)O₂ âm - nghi nhiễm không khí vào mẫu.');
+
+      /* ── 3 TẦNG ĐỘC LẬP (Nhánh A) ───────────────────────────
+         T1 hiệu quả oxy hóa = P/F (Bước 1.3) · T2 cơ chế = p(A-a)O₂ · T3 suy hô hấp = PaCO₂/giảm oxy thực sự */
+      const aaHigh = aaActual > aaPred;
+      const co2High = I.pco2 > CO2_HI;
+      const hypoxemic = analyzeSHH;          // giảm oxy máu thực sự: PaO₂<60 hoặc P/F<300
+
+      /* Tầng 2 - cơ chế trao đổi khí (độc lập với việc có suy hô hấp hay không) */
+      if (aaHigh) { oxy.mechanism = 'Rối loạn trao đổi khí tại phổi (p(A-a)O₂ tăng)'; oxy.mechStatus = 'warn'; gasExchAbn = true; }
+      else if (co2High) { oxy.mechanism = 'Giảm thông khí phế nang (p(A-a)O₂ bình thường, PaCO₂ tăng)'; oxy.mechStatus = 'warn'; }
+      else if (hypoxemic) { oxy.mechanism = 'p(A-a)O₂ và PaCO₂ bình thường - nghĩ giảm PiO₂ (lên cao, đám cháy)'; oxy.mechStatus = 'warn'; }
+      else { oxy.mechanism = 'Khuynh áp phế nang–động mạch bình thường'; oxy.mechStatus = 'ok'; }
+
+      /* Tầng 3 - suy hô hấp: type II theo PaCO₂ (KHÔNG qua cổng oxy); type I/III cần giảm oxy thực sự */
+      if (co2High) shhType = (aaHigh && hypoxemic) ? 3 : 2;
+      else if (hypoxemic && aaHigh) shhType = 1;
+    } else {
+      const pAO2 = r1(FF * 713 - I.pco2 / 0.8);
+      const ratio = r2(I.po2 / pAO2);
+      oxy.pAO2 = pAO2; oxy.ratio = ratio;
+      const co2High = I.pco2 > CO2_HI;
+      const gasExch = ratio < 0.75;
+      const hypoxemic = analyzeSHH;          // Nhánh B: P/F < 300
+
+      /* Tầng 2 - cơ chế */
+      if (gasExch) { oxy.mechanism = 'Rối loạn trao đổi khí tại phổi (paO₂/pAO₂ < 0,75)'; oxy.mechStatus = 'warn'; gasExchAbn = true; }
+      else { oxy.mechanism = 'Khuynh áp phế nang–động mạch bình thường (paO₂/pAO₂ ≥ 0,75)'; oxy.mechStatus = 'ok'; }
+
+      /* Tầng 3 - suy hô hấp: type II theo PaCO₂ độc lập; type I/III cần P/F < 300 */
+      if (co2High) shhType = (gasExch && hypoxemic) ? 3 : 2;
+      else if (hypoxemic && gasExch) shhType = 1;
+    }
+
+    /* Tầng 3 - nhãn suy hô hấp (đề xuất, không phải chẩn đoán) + cờ bất thường */
+    if (shhType) {
+      oxy.shhLabel = (shhType === 1 ? 'Phù hợp suy hô hấp giảm oxy máu (type I)'
+                    : shhType === 2 ? 'Phù hợp suy hô hấp tăng CO₂ (type II)'
+                    : 'Phù hợp suy hô hấp hỗn hợp (type III)') + '.';
+      oxyAbnormal = true;
+    }
+    if (gasExchAbn) oxyAbnormal = true;
+
+    /* 1.3 P/F */
+    if (roomAir) {
+      oxy.pfNote = 'FiO₂ = 21% → chỉ tham khảo, không dán nhãn ARDS (Berlin 2012 cần PEEP/CPAP ≥ 5 cmH₂O).';
+      if (pf < 300) oxyAbnormal = true;
+    } else {
+      let pg;
+      if (pf > 400) pg = 'Bình thường';
+      else if (pf >= 300) { pg = 'Giảm hiệu quả oxy hóa máu nhẹ'; oxy.pfMild = true; }
+      else if (pf >= 200) { pg = 'ARDS nhẹ'; ardsGrade = 'nhẹ'; }
+      else if (pf >= 100) { pg = 'ARDS trung bình'; ardsGrade = 'trung bình'; }
+      else { pg = 'ARDS nặng'; ardsGrade = 'nặng'; }
+      oxy.pfGrade = pg;
+      if (ardsGrade) oxy.pfNote = 'Chẩn đoán ARDS cần thêm: X-quang phổi thâm nhiễm hai bên + loại trừ suy tim/quá tải dịch.';
+      if (pf < 400) oxyAbnormal = true;
+    }
+
+    /* 1.4 CaO₂ */
+    if (has(I.hb) && has(I.so2)) {
+      const cao2 = r1(I.hb * (I.so2 / 100) * 1.34 + I.po2 * 0.003);
+      oxy.cao2 = cao2;
+      oxy.cao2Status = (cao2 >= 16 && cao2 <= 22) ? 'ok' : 'warn';
+    } else if (has(I.po2) && I.po2 > 60) {
+      orderSet.add('Hb (nếu lâm sàng không tương xứng PaO₂ / tím tái → tính CaO₂)');
+    }
+
+    /* summary oxy - theo 3 tầng: hiệu quả → cơ chế → suy hô hấp */
+    let oxyLine;
+    if (!oxyAbnormal) oxyLine = 'Oxy hóa máu chưa ghi nhận đặc biệt.';
+    else {
+      const parts = [];
+      if (hypoxemiaGrade) parts.push(`Hạ oxy máu ${hypoxemiaGrade}.`);
+      if (ardsGrade) parts.push(`ARDS ${ardsGrade}.`);
+      else if (oxy.pfMild) parts.push('Giảm hiệu quả oxy hóa máu nhẹ.');
+      if (gasExchAbn) parts.push('Rối loạn trao đổi khí tại phổi.');
+      if (shhType) parts.push(`Suy hô hấp ${shhType === 1 ? 'giảm oxy máu (type I)' : shhType === 2 ? 'tăng CO₂ (type II)' : 'hỗn hợp (type III)'}.`);
+      if (!parts.length) parts.push('Giảm oxy hóa máu.');
+      oxyLine = parts.join(' ');
+    }
+    oxy.summaryLine = oxyLine;
+    oxy.abnormal = oxyAbnormal;
+    oxy.shhType = shhType; oxy.ardsGrade = ardsGrade; oxy.hypoxemiaGrade = hypoxemiaGrade;
+    oxy.gasExchAbn = gasExchAbn;
+    out.oxy = oxy;
+    out.summary.oxyLine = oxyLine;
+  }
+
+  /* ================= NHÓM 2 - KIỀM TOAN ================= */
+  if (has(I.ph) && has(I.pco2) && has(I.hco3)) {
+    const ab = {};
+    /* 2.1 pH */
+    let phText, phStatus;
+    if (I.ph < 7.2) { phText = 'Toan máu nặng'; phStatus = 'bad'; }
+    else if (I.ph < PH_LO) { phText = 'Toan máu'; phStatus = 'warn'; }
+    else if (I.ph <= PH_HI) { phText = 'Trong giới hạn bình thường'; phStatus = 'ok'; }
+    else if (I.ph <= 7.5) { phText = 'Kiềm máu'; phStatus = 'warn'; }
+    else { phText = 'Kiềm máu nặng'; phStatus = 'bad'; }
+    ab.phText = phText; ab.phStatus = phStatus;
+
+    const acidemia = I.ph < PH_LO;
+    const alkalemia = I.ph > PH_HI;
+    const co2High = I.pco2 > CO2_HI, co2Low = I.pco2 < CO2_LO;
+    const hco3High = I.hco3 > HCO3_HI, hco3Low = I.hco3 < HCO3_LO;
+
+    /* ----- helper: rối loạn hô hấp tiên phát (2.3) ----- */
+    function respiratory(dir) { // dir: 'toan'(CO2 cao) | 'kiem'(CO2 thấp)
+      const dpH = I.ph - 7.4, dPco2 = I.pco2 - 40;
+      const node = { dir };
+      if (Math.abs(dpH) < 0.01) {
+        node.chronicity = null;
+        node.note = 'ΔpH < 0,01 → không xác định cấp/mạn, xét rối loạn phối hợp (bước 2.5).';
+        return node;
+      }
+      const X = r2(Math.abs(dpH) * 10 / Math.abs(dPco2));
+      node.X = X;
+      let chronicity = null, extra = null;
+      if (X > 0.085) { chronicity = 'cấp'; extra = 'same'; }
+      else if (X >= 0.07) chronicity = 'cấp';
+      else if (X > 0.035) chronicity = 'cấp trên nền mạn';
+      else if (X >= 0.025) chronicity = 'mạn';
+      else { chronicity = 'mạn'; extra = 'opposite'; }
+      node.chronicity = chronicity;
+
+      /* rối loạn cấp không thể bù hoàn toàn */
+      if (chronicity === 'cấp' && I.ph >= PH_LO && I.ph <= PH_HI)
+        node.combinedFlag = 'Rối loạn hô hấp cấp nhưng pH bình thường → bắt buộc có rối loạn chuyển hóa phối hợp.';
+
+      /* phối hợp chuyển hóa từ X */
+      if (extra === 'same') {
+        node.added = dir === 'toan' ? 'Toan chuyển hóa phối hợp' : 'Kiềm chuyển hóa phối hợp';
+        node.addedTag = dir === 'toan' ? 'TC' : 'KC';
+      } else if (extra === 'opposite') {
+        node.added = dir === 'toan' ? 'Kiềm chuyển hóa phối hợp' : 'Toan chuyển hóa phối hợp';
+        node.addedTag = dir === 'toan' ? 'KC' : 'TC';
+      }
+
+      /* giới hạn bù sinh lý (chỉ toan hô hấp) */
+      if (dir === 'toan') {
+        if (chronicity === 'cấp' && I.hco3 >= 30)
+          node.exceed = 'HCO₃ vượt giới hạn bù cấp (< 30) → gợi ý kiềm chuyển hóa phối hợp.';
+        if ((chronicity === 'mạn' || chronicity === 'cấp trên nền mạn') && I.hco3 >= 55)
+          node.exceed = 'HCO₃ vượt giới hạn bù mạn (< 55) → gợi ý kiềm chuyển hóa phối hợp.';
+      }
+      return node;
+    }
+
+    /* ----- helper: rối loạn chuyển hóa tiên phát (2.4) ----- */
+    function metabolic(dir) { // dir:'toan'(HCO3 thấp) | 'kiem'(HCO3 cao)
+      const node = { dir };
+      if (dir === 'toan') {
+        let pred = 1.5 * I.hco3 + 8;
+        let floored = false;
+        if (pred < 10) { pred = 10; floored = true; }
+        node.predCO2 = r1(pred); node.floored = floored;
+        const lo = pred - 2, hi = pred + 2;
+        if (I.pco2 >= lo && I.pco2 <= hi) node.comp = 'bù đủ';
+        else if (I.pco2 > hi) { node.comp = 'bù đủ'; node.added = 'Toan hô hấp phối hợp'; node.addedTag = 'TH'; }
+        else { node.comp = 'bù đủ'; node.added = 'Kiềm hô hấp phối hợp'; node.addedTag = 'KH'; }
+        /* lưu ý: comp 'bù đủ' chỉ khi trong khoảng; nếu lệch thì là phối hợp, không phải bù đủ */
+        if (I.pco2 < lo || I.pco2 > hi) node.comp = (I.pco2 > hi ? 'bù chưa đủ (PaCO₂ cao)' : 'bù quá mức (PaCO₂ thấp)');
+      } else {
+        const pred = 0.7 * I.hco3 + 21;
+        node.predCO2 = r1(pred);
+        const lo = pred - 2, hi = pred + 2;
+        if (I.pco2 >= lo && I.pco2 <= hi) node.comp = 'bù đủ';
+        else if (I.pco2 > hi) { node.comp = 'bù chưa đủ (PaCO₂ cao)'; node.added = 'Toan hô hấp phối hợp'; node.addedTag = 'TH'; }
+        else { node.comp = 'bù quá mức (PaCO₂ thấp)'; node.added = 'Kiềm hô hấp phối hợp'; node.addedTag = 'KH'; }
+        if (I.pco2 > 55) node.exceed = 'PaCO₂ vượt giới hạn bù sinh lý (< 55) → gợi ý toan hô hấp phối hợp.';
+      }
+      return node;
+    }
+
+    /* ----- 2.2 xác định tiên phát ----- */
+    ab.steps = [];
+    if (acidemia) {
+      if (co2High && hco3Low) {
+        /* phối hợp cùng chiều toan */
+        S.primaryResp = respiratory('toan');
+        S.tags.add('TH');
+        S.primaryMetab = metabolic('toan'); S.tags.add('TC');
+        ab.primary = 'Toan hỗn hợp (toan hô hấp + toan chuyển hóa)';
+      } else if (co2High) {
+        S.primaryResp = respiratory('toan'); S.tags.add('TH');
+        ab.primary = 'Toan hô hấp tiên phát';
+      } else if (hco3Low) {
+        S.primaryMetab = metabolic('toan'); S.tags.add('TC');
+        ab.primary = 'Toan chuyển hóa tiên phát';
+      } else {
+        ab.primary = 'Toan máu nhưng PaCO₂ và HCO₃ trong giới hạn - kiểm tra lại số liệu.';
+      }
+    } else if (alkalemia) {
+      if (co2Low && hco3High) {
+        S.primaryResp = respiratory('kiem'); S.tags.add('KH');
+        S.primaryMetab = metabolic('kiem'); S.tags.add('KC');
+        ab.primary = 'Kiềm hỗn hợp (kiềm hô hấp + kiềm chuyển hóa)';
+      } else if (co2Low) {
+        S.primaryResp = respiratory('kiem'); S.tags.add('KH');
+        ab.primary = 'Kiềm hô hấp tiên phát';
+      } else if (hco3High) {
+        S.primaryMetab = metabolic('kiem'); S.tags.add('KC');
+        ab.primary = 'Kiềm chuyển hóa tiên phát';
+      } else {
+        ab.primary = 'Kiềm máu nhưng PaCO₂ và HCO₃ trong giới hạn - kiểm tra lại số liệu.';
+      }
+    } else {
+      /* pH bình thường - 2.5 */
+      const co2Abn = co2High || co2Low, hco3Abn = hco3High || hco3Low;
+      if (!co2Abn && !hco3Abn) {
+        ab.primary = 'Không rối loạn kiềm toan.';
+      } else if (co2High && hco3High) {
+        /* toan hô hấp mạn bù đủ HOẶC + kiềm chuyển hóa - verify */
+        const node = respiratory('toan'); S.primaryResp = node; S.tags.add('TH');
+        if (!node.chronicity) node.chronicity = 'mạn'; // pH bình thường + HCO₃ cao = bù mạn
+        ab.primary = 'pH bình thường, PaCO₂↑ HCO₃↑';
+        if (node.exceed || node.added) ab.p25 = 'Toan hô hấp kèm rối loạn chuyển hóa phối hợp (đối chiếu dòng bù trừ bên dưới).';
+        else ab.p25 = `Toan hô hấp ${node.chronicity} bù đủ (đã kiểm tra công thức bù).`;
+      } else if (co2Low && hco3Low) {
+        const node = metabolic('toan'); S.primaryMetab = node; S.tags.add('TC');
+        ab.primary = 'pH bình thường, PaCO₂↓ HCO₃↓';
+        ab.p25 = node.added ? 'Toan chuyển hóa kèm rối loạn hô hấp phối hợp (PaCO₂ thực lệch dự đoán Winter - xem dòng bù trừ).'
+                            : 'Toan chuyển hóa bù đủ (đã kiểm tra công thức bù).';
+      } else if (co2High && hco3Low) {
+        S.primaryResp = { dir: 'toan', chronicity: null }; S.tags.add('TH');
+        S.primaryMetab = { dir: 'toan', comp: '-' }; S.tags.add('TC');
+        ab.primary = 'pH bình thường, PaCO₂↑ HCO₃↓ → Toan hô hấp + Toan chuyển hóa (triệt tiêu nhau).';
+      } else if (co2Low && hco3High) {
+        S.primaryResp = { dir: 'kiem', chronicity: null }; S.tags.add('KH');
+        S.primaryMetab = { dir: 'kiem', comp: '-' }; S.tags.add('KC');
+        ab.primary = 'pH bình thường, PaCO₂↓ HCO₃↑ → Kiềm hô hấp + Kiềm chuyển hóa (triệt tiêu nhau).';
+      } else {
+        ab.primary = 'pH bình thường, chỉ một thông số bất thường - rối loạn nhẹ/sai số, theo dõi.';
+      }
+    }
+
+    /* gom added disorders - bỏ qua nếu đã có cả 2 tiên phát (tránh đếm trùng) */
+    const bothPrimary = S.primaryResp && S.primaryResp.dir && S.primaryMetab && S.primaryMetab.dir;
+    if (!bothPrimary) {
+      if (S.primaryResp && S.primaryResp.added) { S.added.push(S.primaryResp.added); if (S.primaryResp.addedTag) S.tags.add(S.primaryResp.addedTag); }
+      if (S.primaryMetab && S.primaryMetab.added) { S.added.push(S.primaryMetab.added); if (S.primaryMetab.addedTag) S.tags.add(S.primaryMetab.addedTag); }
+    }
+
+    ab.S = S;
+    out.ab = ab;
+
+    /* đề xuất order cho toan chuyển hóa */
+    if (S.tags.has('TC')) {
+      orderSet.add('Na⁺, Cl⁻ (tính khoảng trống anion)');
+      orderSet.add('Albumin (hiệu chỉnh AG)');
+      orderSet.add('Lactate');
+    }
+  }
+
+  /* ================= NHÓM 3 - ANION GAP ================= */
+  if (has(I.na) && has(I.cl) && has(I.hco3)) {
+    const ag = {};
+    const AG = r1(I.na - (I.cl + I.hco3));
+    ag.AG = AG;
+    if (AG < 4) ag.agText = 'AG thấp bất thường - gợi ý giảm albumin nặng / paraproteinemia';
+    else if (AG <= 12) ag.agText = 'AG bình thường';
+    else ag.agText = 'AG tăng';
+    ag.agStatus = AG > 12 ? 'bad' : (AG < 4 ? 'warn' : 'ok');
+
+    let effectiveHighAG = AG > 12;
+    /* 3.2 hiệu chỉnh albumin */
+    if (has(I.albumin)) {
+      const AGc = r1(AG + 2.5 * (4.5 - I.albumin));
+      ag.AGc = AGc;
+      if (AG <= 12 && AGc <= 12) ag.corrText = 'Toan chuyển hóa KHÔNG tăng AG';
+      else if (AG <= 12 && AGc > 12) { ag.corrText = 'AG bị che giấu bởi giảm albumin - thực sự TĂNG AG'; effectiveHighAG = true; }
+      else ag.corrText = 'Toan chuyển hóa TĂNG AG';
+    } else if (S.tags.has('TC')) {
+      orderSet.add('Albumin (hiệu chỉnh AG)');
+    }
+
+    /* gán subtype cho toan chuyển hóa */
+    if (S.primaryMetab && S.primaryMetab.dir === 'toan') {
+      if (effectiveHighAG) { S.primaryMetab.subtype = 'tăng AG'; S.tags.delete('TC'); S.tags.add('TCt'); }
+      else { S.primaryMetab.subtype = 'không tăng AG'; S.tags.delete('TC'); S.tags.add('TCk'); }
+    }
+
+    /* hướng nguyên nhân toan không tăng AG theo Cl */
+    if (!effectiveHighAG && (AG <= 12)) {
+      if (I.cl > 106) ag.clHint = 'Cl⁻ tăng (hyperchloremic) → mất HCO₃ qua tiêu hóa (tiêu chảy, dò ruột…).';
+      else ag.clHint = 'Cl⁻ bình thường → mất HCO₃ qua thận (toan ống thận, Acetazolamide…).';
+    }
+
+    /* 3.3 delta ratio - chỉ khi AG>12 VÀ HCO3<24 */
+    if (AG > 12 && I.hco3 < 24) {
+      const dAG = AG - 12, dHCO3 = 24 - I.hco3;
+      const ratio = r2(dAG / dHCO3);
+      ag.deltaRatio = ratio;
+      if (ratio < 1) ag.deltaRatioText = 'Toan CH tăng AG + Toan CH không tăng AG';
+      else if (ratio <= 2) ag.deltaRatioText = 'Toan CH tăng AG đơn thuần';
+      else ag.deltaRatioText = 'Gợi ý kiềm chuyển hóa hoặc toan hô hấp mạn nền phối hợp';
+    } else if (AG > 12 && I.hco3 >= 24) {
+      ag.deltaRatioSkip = 'AG > 12 nhưng HCO₃ ≥ 24 → tự thân gợi ý kiềm chuyển hóa phối hợp.';
+    }
+
+    /* 3.4 delta gap - khi AG>12 */
+    if (AG > 12) {
+      const dg = r1(I.hco3 + (AG - 12));
+      ag.deltaGap = dg;
+      ag.deltaGapText = dg > 24 ? 'Gợi ý kiềm chuyển hóa phối hợp' : 'Không gợi ý rõ rối loạn phối hợp';
+    }
+    out.ag = ag;
+  } else if (S.tags.has('TC') || S.tags.has('TCt') || S.tags.has('TCk')) {
+    orderSet.add('Na⁺, Cl⁻ (tính khoảng trống anion)');
+  }
+
+  /* ================= NHÓM 4 - LACTATE ================= */
+  if (has(I.lactate)) {
+    const lac = { value: I.lactate };
+    if (I.lactate < 2) { lac.text = 'Lactate bình thường'; lac.status = 'ok'; }
+    else if (I.lactate <= 4) { lac.text = 'Tăng lactate nhẹ–trung bình'; lac.status = 'warn'; }
+    else { lac.text = 'Tăng lactate nặng'; lac.status = 'bad'; }
+    /* toan lactic: lactate>4 VÀ pH<7.35 VÀ HCO3<22 */
+    if (I.lactate > 4 && has(I.ph) && has(I.hco3)) {
+      if (I.ph < 7.35 && I.hco3 < 22) { lac.lactic = true; S.lactic = true; lac.concl = 'Đủ tiêu chuẩn TOAN LACTIC.'; }
+      else lac.concl = 'Tăng lactate nặng - chưa đủ tiêu chuẩn toan lactic (kiềm chuyển hóa đồng thời có thể che giấu).';
+    }
+    out.lac = lac;
+  } else if (S.tags.has('TCt')) {
+    orderSet.add('Lactate (ưu tiên - toan chuyển hóa tăng AG)');
+  }
+
+  /* ================= TỔNG HỢP ================= */
+  /* dòng kiềm toan */
+  let abLine = '';
+  if (out.ab) {
+    const phrases = [];
+    /* hô hấp tiên phát */
+    if (S.primaryResp && S.primaryResp.dir) {
+      if (S.primaryResp.dir === 'toan')
+        phrases.push(`Toan hô hấp${S.primaryResp.chronicity ? ' ' + S.primaryResp.chronicity : ''}.`);
+      else phrases.push('Kiềm hô hấp.');
+    }
+    /* chuyển hóa tiên phát */
+    if (S.primaryMetab && S.primaryMetab.dir) {
+      if (S.primaryMetab.dir === 'toan') {
+        let t = 'Toan chuyển hóa';
+        if (S.primaryMetab.subtype) t += ' ' + S.primaryMetab.subtype;
+        if (S.primaryMetab.comp && /bù đủ/.test(S.primaryMetab.comp)) t += ', bù đủ';
+        phrases.push(t + '.');
+      } else {
+        let t = 'Kiềm chuyển hóa';
+        if (S.primaryMetab.comp && /bù đủ/.test(S.primaryMetab.comp)) t += ', bù đủ';
+        phrases.push(t + '.');
+      }
+    }
+    /* phối hợp */
+    S.added.forEach(a => phrases.push(a + '.'));
+    /* lactic */
+    if (S.lactic) phrases.push('Toan lactic.');
+
+    if (!phrases.length) abLine = 'Thăng bằng kiềm toan chưa ghi nhận đặc biệt.';
+    else abLine = phrases.join(' ');
+  }
+  out.summary.abLine = abLine;
+  out.ab && (out.ab.summaryLine = abLine);
+
+  /* normal? */
+  const oxyNormal = !out.oxy || !out.oxy.abnormal;
+  const abNormal = !abLine || /chưa ghi nhận đặc biệt/.test(abLine);
+  out.summary.normal = oxyNormal && abNormal;
+
+  out.orders = [...orderSet];
+  out.S = S;
+  return out;
+}
+
+/* =====================================================================
+   APP.JS - KMĐM Analyzer
+   - parseABG()  : port nguyên từ module dán (2 định dạng phiếu)
+   - paste/modal : port nguyên
+   - MODULE 2    : từ điển gợi ý nguyên nhân lâm sàng
+   - runAnalysis : đọc form → analyze() → renderResults()
+   ===================================================================== */
+
+const FIELDS = [
+  { key:'ph',      id:'f_ph',      label:'pH(T)',       unit:'',        source:'EasyBloodgas_2' },
+  { key:'pco2',    id:'f_pco2',    label:'PCO₂(T)',     unit:'mmHg',   source:'EasyBloodgas_2' },
+  { key:'po2',     id:'f_po2',     label:'PO₂(T)',      unit:'mmHg',   source:'EasyBloodgas_2' },
+  { key:'hco3',    id:'f_hco3',    label:'cHCO₃⁻',     unit:'mmol/L', source:'EasyBloodgas_2' },
+  { key:'so2',     id:'f_so2',     label:'SO₂',         unit:'%',      source:'EasyBloodgas_2' },
+  { key:'fio2',    id:'f_fio2',    label:'FiO₂',        unit:'%',      source:'Phiếu XN' },
+  { key:'age',     id:'f_age',     label:'Tuổi',        unit:'năm',    source:'Tính từ NS' },
+  { key:'lactate', id:'f_lactate', label:'Lactate',     unit:'mmol/L', source:'DXC 700' },
+];
+
+/* ================================================================
+   PARSER - 2 định dạng text từ hệ thống bệnh viện
+   A) GARBLED (thứ tự cột PDF): VALUE (ref) [unit] EasyBloodgas_2 [code] LABEL
+   B) CLEAN  (copy thường):     LABEL VALUE (ref) [unit]
+================================================================ */
+function parseABG(text) {
+  const d = { isABG: false };
+  const garbled = /EasyBloodgas_2\s+QT-XN-\d+\s+PH\(T\)/i.test(text);
+  const num = (re) => { const m = text.match(re); return m ? +m[1] : null; };
+
+  if (garbled) {
+    d.ph   = num(/([\d.]+)\s*\([^)]*\)\s*EasyBloodgas_2\s+QT-XN-\d+\s+PH\(T\)/i);
+    d.pco2 = num(/([\d.]+)\s*\([^)]*\)\s*mmHg\s+EasyBloodgas_2\s+QT-XN-\d+\s+PCO2\(T\)/i);
+    d.hco3 = num(/([\d.]+)\s*\([^)]*\)\s*mmol\/L\s+EasyBloodgas_2\s+QT-XN-\d+\s+CHCO3-/i);
+    d.po2  = num(/([\d.]+)\s*\([^)]*\)\s*mmHg\s+EasyBloodgas_2\s+QT-XN-\d+\s+PO2\(T\)/i);
+    d.so2  = num(/([\d.]+)\s*\([^)]*\)\s*%\s+EasyBloodgas_2\s+SO2/i);
+    d.fio2 = num(/([\d.]+)\s*%\s+FIO2/i);
+    if (d.fio2 === null) d.fio2 = num(/([\d.]+)\s+FIO2/i);
+    d.temp = num(/([\d.]+)\s+NHI[ÊE]T\s*[ĐD][ÔO]/i);
+  } else {
+    d.ph   = num(/PH\(T\)\s+([\d.]+)/i);
+    d.pco2 = num(/PCO2\(T\)\s+([\d.]+)/i);
+    d.hco3 = num(/[Cc]HCO3-?\s+([\d.]+)/);
+    d.po2  = num(/PO2\(T\)\s+([\d.]+)/i);
+    d.so2  = num(/SO2\s+([\d.]+)\s*\(/i);
+    d.fio2 = num(/FIO2\s+([\d.]+)/i);
+    d.temp = num(/NHI[ÊE]T\s*[ĐD][ÔO]\s+([\d.]+)/i);
+  }
+
+  d.lactate = num(/LACTAC\s+([\d.]+)/i);
+
+  /* DOB → tuổi */
+  const nsPos = text.search(/N[aă]m sinh/i);
+  if (nsPos !== -1) {
+    const after = text.slice(nsPos);
+    const allDates = [...after.matchAll(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g)];
+    for (const m of allDates) {
+      const yr = +m[3];
+      if (yr >= 1920 && yr <= 2010) {
+        const day = +m[1], mon = +m[2];
+        const now = new Date();
+        let age = now.getFullYear() - yr;
+        if (now.getMonth() + 1 < mon ||
+            (now.getMonth() + 1 === mon && now.getDate() < day)) age--;
+        d.age = age;
+        d.dob = `${String(day).padStart(2,'0')}/${String(mon).padStart(2,'0')}/${yr}`;
+        break;
+      }
+    }
+  }
+
+  /* Tên BN */
+  const mbn = text.match(/Mã BN\s*:\s*\d+\s+(.+?)\s+STT:/i);
+  if (mbn) {
+    d.name = mbn[1].trim();
+  } else {
+    const ht = text.match(/Họ tên\s*:\s*(.+?)(?=N[aă]m sinh|Khoa|Chẩn|Ng[aà]y|\n)/i);
+    if (ht) d.name = ht[1].trim();
+  }
+
+  const ct = text.match(/Ng[aà]y l[aấ]y m[aẫ]u\s*:\s*(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/i);
+  if (ct) d.collectedAt = ct[1];
+
+  const dx = text.match(/Ch[aẩ]n [dđ]o[aá]n\s*:\s*(.+?)(?=M[aã] BN|Ng[aà]y l[aấ]y|STT:|$)/i);
+  if (dx) d.diagnosis = dx[1].trim().replace(/\s+/g,' ').slice(0, 220);
+
+  d.isABG = !!(d.ph || d.pco2 || d.po2 || d.hco3);
+  return d;
+}
+
+/* ================================================================
+   PASTE - tự xóa dữ liệu cũ → điền → phân tích (không popup)
+================================================================ */
+const ALL_FIELD_IDS = ['f_ph','f_pco2','f_po2','f_hco3','f_so2','f_fio2','f_age','f_na','f_cl','f_albumin','f_hb','f_lactate'];
+
+function clearForm() {
+  ALL_FIELD_IDS.forEach(id => { const e = document.getElementById(id); if (e) { e.value = ''; e.classList.remove('filled'); } });
+}
+
+function handlePaste(text) {
+  if (!text || text.length < 30) return;
+  const data = parseABG(text);
+  if (data.isABG) applyData(data);
+  else if (text.length > 100) showErr();
+}
+
+document.addEventListener('paste', (e) => {
+  const tgt = e.target;
+  if (tgt && tgt.tagName === 'INPUT' && tgt.id !== 'pasteCapture') return;
+  const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+  if (text && text.length >= 30) { e.preventDefault(); handlePaste(text); }
+});
+
+document.getElementById('pasteCapture').addEventListener('input', function () {
+  const text = this.innerText || this.textContent || '';
+  this.innerHTML = '';
+  handlePaste(text);
+});
+
+function focusPaste() { document.getElementById('pasteCapture').focus(); }
+
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
+    const a = document.activeElement;
+    if (!a || a.tagName === 'BODY' || a === document.getElementById('pasteZone')) {
+      e.preventDefault();
+      focusPaste();
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(t => handlePaste(t)).catch(() => focusPaste());
+      }
+    }
+  }
+});
+
+function applyData(data) {
+  clearForm();
+  let count = 0;
+  FIELDS.forEach(f => {
+    const v = data[f.key];
+    if (v !== null && v !== undefined) {
+      const el = document.getElementById(f.id);
+      if (el) { el.value = v; el.classList.remove('filled'); void el.offsetWidth; el.classList.add('filled'); count++; }
+    }
+  });
+
+  const card = document.getElementById('ptCard');
+  if (data.name || data.age) {
+    card.classList.add('show');
+    document.getElementById('ptName').textContent = data.name || '';
+    const meta = [];
+    if (data.dob) meta.push('Ngày sinh: ' + data.dob);
+    if (data.age) meta.push(data.age + ' tuổi');
+    if (data.collectedAt) meta.push('Lấy mẫu: ' + data.collectedAt);
+    document.getElementById('ptMeta').textContent = meta.join('  ·  ');
+    document.getElementById('ptDiag').textContent = data.diagnosis || '';
+  } else {
+    card.classList.remove('show');
+  }
+
+  runAnalysis();
+  toast('Đã điền ' + count + ' thông số - đã phân tích', 'ok');
+  const res = document.getElementById('results');
+  if (res && res.scrollIntoView) res.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showErr() {
+  toast('Không nhận ra định dạng phiếu KMĐM', 'err');
+}
+
+/* ================================================================
+   TOAST
+================================================================ */
+let toastTimer;
+function toast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show${type ? ' ' + type : ''}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = 'toast'; }, 3500);
+}
+
+/* ================================================================
+   MODULE 2 - Gợi ý nguyên nhân lâm sàng
+================================================================ */
+const M2_SHH = {
+  1: 'Bất xứng V/Q: COPD, hen, thuyên tắc phổi · Shunt: viêm phổi nặng, phù phổi, ARDS, xẹp phổi · Rối loạn khuếch tán: xơ phổi, bệnh phổi mô kẽ',
+  2: 'Ức chế TKTW: ngộ độc opioid/benzodiazepin, CTSN, TBMMN · Tổn thương thần kinh-cơ: Guillain-Barré, nhược cơ · Bệnh phổi tắc nghẽn nặng: COPD giai đoạn cuối · Bất thường thành ngực: béo phì nặng, gù vẹo cột sống',
+  3: 'Phối hợp nguyên nhân type I và type II',
+};
+const M2_ARDS = 'Viêm phổi nặng · Nhiễm trùng huyết · Hít sặc · Chấn thương nặng, bỏng · Viêm tụy cấp nặng';
+
+const M2_SINGLE = {
+  'TH_cấp': 'Ức chế hô hấp cấp: ngộ độc opioid, benzodiazepin · Co thắt phế quản nặng · Tắc nghẽn đường thở cấp · Phù phổi cấp · Tràn khí màng phổi',
+  'TH_mạn': 'COPD giai đoạn cuối · Hội chứng giảm thông khí do béo phì · Bệnh thần kinh-cơ tiến triển mạn (ALS, loạn dưỡng cơ) · Gù vẹo cột sống nặng',
+  'TH_cấp trên nền mạn': 'Đợt cấp COPD · Nhiễm trùng hô hấp trên nền bệnh phổi mạn · Dùng thuốc ức chế hô hấp ở bệnh nhân COPD',
+  'TH_': 'Toan hô hấp - phân biệt cấp/mạn để định hướng nguyên nhân.',
+  'KH': 'Lo lắng, đau, sốt · Nhiễm trùng huyết giai đoạn sớm · Bệnh gan nặng · Ngộ độc salicylate giai đoạn sớm · Thai kỳ · Thở máy thông khí phút quá cao',
+  'TCt': 'Toan lactic: sốc, thiếu oxy nặng, ngộ độc CO · Toan ceton: DKA, nhịn đói, nghiện rượu · Suy thận cấp/mạn giai đoạn cuối · Ngộ độc: methanol, ethylene glycol, salicylate',
+  'TCk': 'Mất HCO₃ qua tiêu hóa: tiêu chảy, dò ruột, dò tụy · Mất HCO₃ qua thận: toan ống thận type I và II, Acetazolamide · Truyền NaCl/dịch chloride cao quá mức',
+  'TC':  'Cần Na⁺, Cl⁻, Albumin để phân loại tăng/không tăng AG. Tăng AG: toan lactic, ceton, suy thận, ngộ độc. Không tăng AG: tiêu chảy, toan ống thận, truyền chloride cao.',
+  'KC':  'Mất acid qua dạ dày: nôn ói kéo dài, hút dạ dày · Lợi tiểu quai/thiazide · Hạ kali máu nặng · Cường aldosteron: Cushing, Conn, corticoid kéo dài · Bù bicarbonate quá mức',
+};
+
+/* combo keyed by tags sorted alphabetically, joined '+' */
+const M2_COMBO = {
+  'TC+TH':  'Ngưng tim ngưng thở · Suy hô hấp nặng kèm sốc · Ngộ độc nặng (opioid liều cao kèm toan lactic)',
+  'TCt+TH': 'Ngưng tim ngưng thở · Suy hô hấp nặng kèm sốc · Ngộ độc nặng (opioid liều cao kèm toan lactic)',
+  'TCk+TH': 'Ngưng tim ngưng thở · Suy hô hấp nặng kèm sốc',
+  'KC+TH':  'COPD kèm nôn ói hoặc lợi tiểu · Suy hô hấp mạn kèm hạ kali máu · Đợt cấp COPD ở bệnh nhân đang dùng corticoid/lợi tiểu',
+  'KH+TCt': 'Nhiễm trùng huyết giai đoạn sớm (kiềm hô hấp phản xạ kèm toan lactic) · Bệnh gan nặng kèm toan lactic · Ngộ độc salicylate',
+  'KH+TCk': 'Suy gan kèm tiêu chảy',
+  'KC+KH':  'Suy gan nặng kèm nôn ói · Thở máy thông khí cao kèm lợi tiểu · Thai kỳ kèm nôn ói nặng',
+  'TCk+TCt':'DKA kèm tiêu chảy · Toan lactic kèm tiêu chảy · Suy thận kèm tiêu chảy',
+  'KC+TCt': 'DKA kèm nôn ói · Toan lactic kèm lợi tiểu hoặc hút dạ dày · Suy thận kèm nôn ói',
+  /* 3 rối loạn */
+  'KC+TCt+TH': 'COPD kèm nhiễm trùng huyết kèm lợi tiểu · Suy hô hấp mạn kèm DKA kèm nôn ói',
+  'TCk+TCt+TH':'Suy hô hấp nặng kèm sốc nhiễm trùng kèm tiêu chảy',
+  'KC+KH+TCt': 'Nhiễm trùng huyết giai đoạn sớm kèm nôn ói kèm lợi tiểu · Bệnh gan nặng kèm toan lactic kèm nôn ói',
+  'KH+TCk+TCt':'Nhiễm trùng huyết kèm toan lactic kèm tiêu chảy',
+};
+
+function causeForSingleResp(node) {
+  if (!node || !node.dir) return null;
+  if (node.dir === 'kiem') return { title: 'Kiềm hô hấp', text: M2_SINGLE['KH'] };
+  const c = node.chronicity || '';
+  return { title: `Toan hô hấp${c ? ' ' + c : ''}`, text: M2_SINGLE['TH_' + c] || M2_SINGLE['TH_'] };
+}
+function causeForSingleMetab(node) {
+  if (!node || !node.dir) return null;
+  if (node.dir === 'kiem') return { title: 'Kiềm chuyển hóa', text: M2_SINGLE['KC'] };
+  const st = node.subtype;
+  if (st === 'tăng AG')      return { title: 'Toan chuyển hóa tăng AG', text: M2_SINGLE['TCt'] };
+  if (st === 'không tăng AG') return { title: 'Toan chuyển hóa không tăng AG', text: M2_SINGLE['TCk'] };
+  return { title: 'Toan chuyển hóa', text: M2_SINGLE['TC'] };
+}
+
+/* Lấy gợi ý nguyên nhân tổng hợp từ tag set */
+function buildCauseHints(r) {
+  const hints = [];
+  const S = r.S || {};
+  const tags = [...(S.tags || [])];
+
+  /* oxy */
+  if (r.oxy && r.oxy.gasExchAbn) hints.push({ title: 'Rối loạn trao đổi khí tại phổi', text: M2_SHH[1] });
+  if (r.oxy && (r.oxy.shhType === 2 || r.oxy.shhType === 3)) hints.push({ title: 'Giảm thông khí phế nang (suy hô hấp tăng CO₂)', text: M2_SHH[2] });
+  if (r.oxy && r.oxy.ardsGrade) hints.push({ title: 'ARDS', text: M2_ARDS });
+
+  /* nếu ≥ 2 rối loạn kiềm toan → ưu tiên combo */
+  const abTags = tags.filter(t => ['TH','KH','TC','TCt','TCk','KC'].includes(t));
+  if (abTags.length >= 2) {
+    const key = [...abTags].sort().join('+');
+    let txt = M2_COMBO[key];
+    if (!txt) {
+      /* fallback: chuẩn hóa TCt/TCk → TC */
+      const norm = [...new Set(abTags.map(t => (t === 'TCt' || t === 'TCk') ? 'TC' : t))].sort().join('+');
+      txt = M2_COMBO[norm];
+    }
+    if (txt) {
+      hints.push({ title: 'Phối hợp ' + abTags.map(tagLabel).join(' + '), text: txt, combo: true });
+    } else {
+      /* không có combo → liệt kê từng rối loạn đơn lẻ */
+      if (S.primaryResp) { const c = causeForSingleResp(S.primaryResp); if (c) hints.push(c); }
+      if (S.primaryMetab){ const c = causeForSingleMetab(S.primaryMetab); if (c) hints.push(c); }
+    }
+  } else if (abTags.length === 1) {
+    if (S.primaryResp && S.primaryResp.dir) { const c = causeForSingleResp(S.primaryResp); if (c) hints.push(c); }
+    if (S.primaryMetab && S.primaryMetab.dir){ const c = causeForSingleMetab(S.primaryMetab); if (c) hints.push(c); }
+  }
+  return hints;
+}
+
+function tagLabel(t) {
+  return ({ TH:'Toan hô hấp', KH:'Kiềm hô hấp', TC:'Toan chuyển hóa',
+            TCt:'Toan CH tăng AG', TCk:'Toan CH không tăng AG', KC:'Kiềm chuyển hóa' })[t] || t;
+}
+
+/* ================================================================
+   ĐỌC FORM
+================================================================ */
+function val(id) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  const v = el.value.trim();
+  if (v === '') return null;
+  const n = +v;
+  return Number.isNaN(n) ? null : n;
+}
+function readForm() {
+  return {
+    ph: val('f_ph'), pco2: val('f_pco2'), po2: val('f_po2'), hco3: val('f_hco3'),
+    so2: val('f_so2'), fio2: val('f_fio2'), age: val('f_age'),
+    na: val('f_na'), cl: val('f_cl'), albumin: val('f_albumin'),
+    hb: val('f_hb'), lactate: val('f_lactate'),
+  };
+}
+
+/* ================================================================
+   RENDER
+================================================================ */
+function chip(text, sev) {
+  sev = sev || 'info';
+  return `<div class="concl s-${sev}">${text}</div>`;
+}
+function metricRow(label, value, sub) {
+  return `<div class="metric"><span class="mk">${label}</span>` +
+         `<span class="mv">${value}</span>` +
+         `${sub ? `<span class="mn">${sub}</span>` : ''}</div>`;
+}
+
+function runAnalysis() {
+  const I = readForm();
+  const have = (v) => v !== null && v !== undefined;
+  const hasAB = have(I.ph) && have(I.pco2) && have(I.hco3);
+  const hasOxy = have(I.po2);
+  if (!hasAB && !hasOxy) {
+    const el = document.getElementById('results');
+    el.innerHTML =
+      `<div class="empty-hint">Nhập tối thiểu <b>pH + PCO₂ + HCO₃⁻</b> (phân tích kiềm toan) ` +
+      `hoặc <b>PO₂</b> (phân tích oxy hóa) - hoặc dán phiếu XN để tự điền.</div>`;
+    el.style.display = 'block';
+    return;
+  }
+  const r = analyze(I);
+  renderResults(r, I);
+}
+
+function renderResults(r, I) {
+  /* ---------- ABG SUMMARY ---------- */
+  let summaryLines;
+  if (r.summary.normal) {
+    summaryLines = ['Khí máu động mạch chưa ghi nhận đặc biệt.'];
+  } else {
+    const oxyLine = r.summary.oxyLine || 'Oxy hóa máu chưa ghi nhận đặc biệt.';
+    const abLine  = r.summary.abLine  || 'Thăng bằng kiềm toan chưa ghi nhận đặc biệt.';
+    summaryLines = ['- ' + oxyLine, '- ' + abLine];
+  }
+  const summaryHtml =
+    `<div class="summary-box">
+       <div class="summary-head">
+         <span class="dot"></span>
+         <h3>ABG Summary</h3>
+         <button class="btn-copy" id="copyBtn" onclick="copySummary()">Copy</button>
+       </div>
+       <div class="summary-body" id="sbText">${summaryLines.map(l => `<span class="sl">${l}</span>`).join('')}</div>
+     </div>`;
+
+  /* ---------- Cảnh báo (full-width trên cùng) ---------- */
+  const rel = r.reliability;
+  const warnLines = [];
+  rel.sampleWarnings.forEach(w => warnLines.push(w));
+  rel.physWarnings.forEach(w => warnLines.push('Giá trị sinh lý: ' + w));
+  if (rel.reliable === false)
+    warnLines.unshift(`HCO₃⁻ tính (Henderson-Hasselbalch) = ${rel.hco3calc} mmol/L, lệch ${rel.delta} so với máy → <b>nghi mẫu không tin cậy</b> (lấy lại mẫu / kiểm tra hiệu chuẩn).`);
+  let bannerHtml = '';
+  if (warnLines.length) {
+    const sev = (rel.reliable === false) ? 'red' : 'amber';
+    bannerHtml = `<div class="warn-banner ${sev}"><div class="wb-t">Cảnh báo</div>` +
+      warnLines.map(w => `<div class="wb-i">• ${w}</div>`).join('') + `</div>`;
+  }
+
+  /* ---------- 0: độ tin cậy ---------- */
+  let relHtml = '';
+  if (rel.hco3calc !== null) {
+    relHtml = section('0', 'Độ tin cậy mẫu', [
+      metricRow('HCO₃⁻ tính (HH)', rel.hco3calc + ' mmol/L', 'so máy lệch ' + rel.delta),
+      rel.reliable ? chip('Mẫu tin cậy (Δ ≤ 4)', 'ok') : chip('Nghi không tin cậy (Δ > 4)', 'warn'),
+    ].join(''));
+  }
+
+  /* ---------- 1: Oxy hóa máu ---------- */
+  let oxyHtml = '';
+  if (r.oxy) {
+    const o = r.oxy;
+    const rows = [];
+    rows.push(chip(o.pao2Grade.text, o.pao2Grade.status));
+    if (o.pao2Predicted != null) rows.push(metricRow('PaO₂ dự đoán theo tuổi', o.pao2Predicted + ' mmHg', '110 − tuổi/2'));
+    if (o.branch === 'A' && o.aaActual != null)
+      rows.push(metricRow('Khuynh áp p(A-a)O₂', o.aaActual + ' mmHg', 'dự đoán ≤ ' + o.aaPredicted));
+    if (o.branch === 'B' && o.ratio != null)
+      rows.push(metricRow('paO₂/pAO₂', o.ratio, 'ngưỡng ≥ 0,75'));
+    if (o.mechanism) rows.push(chip(o.mechanism, o.mechStatus || 'ok'));
+    if (o.pf != null) rows.push(metricRow('P/F (PaO₂/FiO₂)', o.pf, o.pfGrade || ''));
+    if (o.pfNote) rows.push(`<div class="note">${o.pfNote}</div>`);
+    if (o.shhLabel) rows.push(chip(o.shhLabel, 'bad'));
+    if (o.cao2 != null) rows.push(metricRow('CaO₂', o.cao2 + ' mL O₂/dL', o.cao2Status === 'ok' ? 'bình thường' : 'bất thường'));
+    oxyHtml = section('1', 'Oxy hóa máu', rows.join(''));
+  }
+
+  /* ---------- 2: Thăng bằng kiềm toan ---------- */
+  let abHtml = '';
+  if (r.ab) {
+    const ab = r.ab; const S = r.S || {};
+    const rows = [];
+    rows.push(chip(ab.phText, ab.phStatus));
+    if (ab.primary) rows.push(chip(ab.primary, 'info'));
+    const pr = S.primaryResp;
+    if (pr && pr.dir) {
+      if (pr.X != null) rows.push(metricRow('X = |ΔpH|×10 / |ΔPaCO₂|', pr.X, pr.chronicity || ''));
+      if (pr.note) rows.push(`<div class="note">${pr.note}</div>`);
+      if (pr.combinedFlag) rows.push(`<div class="note warn">${pr.combinedFlag}</div>`);
+      if (pr.exceed) rows.push(`<div class="note warn">${pr.exceed}</div>`);
+    }
+    const pm = S.primaryMetab;
+    if (pm && pm.dir && pm.predCO2 != null) {
+      const f = pm.dir === 'toan' ? "Winter: 1,5×HCO₃ + 8" : "0,7×HCO₃ + 21";
+      rows.push(metricRow('PaCO₂ dự đoán', pm.predCO2 + ' mmHg', f + (pm.floored ? ' · sàn 10' : '')));
+      if (pm.comp) rows.push(chip('Bù trừ: ' + pm.comp, /bù đủ/.test(pm.comp) ? 'ok' : 'warn'));
+      if (pm.exceed) rows.push(`<div class="note warn">${pm.exceed}</div>`);
+    }
+    if (ab.p25) rows.push(chip(ab.p25, 'info'));
+    if (S.added && S.added.length) S.added.forEach(a => rows.push(chip(a, 'warn')));
+    abHtml = section('2', 'Thăng bằng kiềm toan', rows.join(''));
+  }
+
+  /* ---------- 3: Khoảng trống anion ---------- */
+  let agHtml = '';
+  if (r.ag) {
+    const g = r.ag;
+    const rows = [];
+    rows.push(metricRow('AG = Na⁺ − (Cl⁻ + HCO₃⁻)', g.AG, ''));
+    rows.push(chip(g.agText, g.agStatus));
+    if (g.AGc != null) {
+      rows.push(metricRow('AG hiệu chỉnh albumin', g.AGc, '+2,5×(4,5 − alb)'));
+      if (g.corrText) rows.push(chip(g.corrText, /TĂNG|che giấu/.test(g.corrText) ? 'bad' : 'ok'));
+    }
+    if (g.clHint) rows.push(`<div class="note">${g.clHint}</div>`);
+    if (g.deltaRatio != null) rows.push(metricRow('Δ ratio (ΔAG/ΔHCO₃)', g.deltaRatio, g.deltaRatioText));
+    if (g.deltaRatioSkip) rows.push(`<div class="note">${g.deltaRatioSkip}</div>`);
+    if (g.deltaGap != null) rows.push(metricRow('Δ gap (Tường Oanh)', g.deltaGap, g.deltaGapText));
+    agHtml = section('3', 'Khoảng trống anion (AG)', rows.join(''));
+  }
+
+  /* ---------- 4: Lactate (dải ngang: value trái – kết luận phải) ---------- */
+  let lacHtml = '';
+  if (r.lac) {
+    const l = r.lac;
+    const band = `<div class="lac-band"><span class="lac-val">${l.value}<small>mmol/L</small></span>` +
+      `<span class="lac-concl s-${l.status}">${l.text}</span></div>`;
+    const extra = l.concl ? `<div class="lac-extra">${chip(l.concl, l.lactic ? 'bad' : 'warn')}</div>` : '';
+    lacHtml = section('4', 'Lactate', band + extra);
+  }
+
+  /* ---------- 5: Gợi ý nguyên nhân ---------- */
+  let causeHtml = '';
+  const hints = buildCauseHints(r);
+  if (hints.length) {
+    const items = hints.map(h => `<div class="cause"><div class="ct">${h.title}</div><div class="cx">${h.text}</div></div>`).join('');
+    causeHtml = section('5', 'Gợi ý nguyên nhân lâm sàng', items);
+  }
+
+  /* ---------- 6: Đề xuất xét nghiệm ---------- */
+  let orderHtml = '';
+  if (r.orders && r.orders.length) {
+    const chips = r.orders.map(o => `<span class="order-chip">+ ${o}</span>`).join('');
+    orderHtml = section('6', 'Đề xuất xét nghiệm bổ sung', `<div class="orders">${chips}</div>`);
+  }
+
+  /* Cột trái: ABG Summary · Oxy(1) · Lactate(4) · Nguyên nhân(5)
+     Cột phải: Độ tin cậy(0) · Kiềm toan(2) · AG(3) · Đề xuất XN(6) */
+  const leftCol  = [summaryHtml, oxyHtml, lacHtml, causeHtml].filter(Boolean).join('');
+  const rightCol = [relHtml, abHtml, agHtml, orderHtml].filter(Boolean).join('');
+
+  const resEl = document.getElementById('results');
+  resEl.innerHTML = bannerHtml +
+    `<div class="res-cols"><div class="res-col">${leftCol}</div><div class="res-col">${rightCol}</div></div>`;
+  resEl.style.display = 'block';
+}
+
+function section(num, title, bodyHtml, subtitle) {
+  return `<div class="res-section">
+            <div class="rs-head"><span class="rs-num">${num}</span><span class="rs-title">${title}</span>
+              ${subtitle ? `<span class="rs-sub">${subtitle}</span>` : ''}</div>
+            <div class="rs-body">${bodyHtml}</div>
+          </div>`;
+}
+
+function copySummary() {
+  const box = document.getElementById('sbText');
+  if (!box) return;
+  const spans = box.querySelectorAll('.sl');
+  const txt = spans.length ? [...spans].map(s => s.textContent).join('\n') : box.textContent;
+  const done = () => {
+    toast('Đã copy ABG Summary', 'ok');
+    const b = document.getElementById('copyBtn');
+    if (b) { b.classList.add('done'); b.textContent = 'Đã copy'; setTimeout(() => { b.classList.remove('done'); b.textContent = 'Copy'; }, 2000); }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done).catch(() => fallbackCopy(txt, done));
+  } else fallbackCopy(txt, done);
+}
+function fallbackCopy(txt, done) {
+  const ta = document.createElement('textarea');
+  ta.value = txt; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); (done || (() => toast('Đã copy ABG Summary', 'ok')))(); }
+  catch (e) { toast('Không copy được - hãy chọn và Ctrl+C', 'err'); }
+  document.body.removeChild(ta);
+}
+
+</script>
+</body>
+</html>
